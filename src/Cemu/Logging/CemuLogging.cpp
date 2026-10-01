@@ -3,6 +3,7 @@
 #include "util/helpers/helpers.h"
 #include "config/CemuConfig.h"
 #include "config/ActiveSettings.h"
+#include "config/LaunchSettings.h"
 
 #include <mutex>
 #include <condition_variable>
@@ -87,6 +88,13 @@ void cemuLog_thread()
 			LogContext.file_stream.write(entry.data(), entry.size());
 
 		LogContext.file_stream.flush();
+
+		if (LaunchSettings::LogToStdout())
+		{
+			for (const auto& entry : cache_copy)
+				fwrite(entry.data(), 1, entry.size(), stdout);
+			fflush(stdout);
+		}
 	}
 }
 

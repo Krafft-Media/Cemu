@@ -250,6 +250,7 @@ void DSUControllerProvider::reader_thread()
 {
 	SetThreadName("DSU-reader");
 	bool first_read = true;
+	auto last_retry = std::chrono::steady_clock::now();
 	while (m_running.load(std::memory_order_relaxed))
 	{
 		ServerMessage* msg;
@@ -266,6 +267,13 @@ void DSUControllerProvider::reader_thread()
 #endif
 
 			// there's probably no server listening on the given address:port
+			// data is only requested again after a response arrives, so ask again while the server is
+			// silent (it may start after Cemu, or restart)
+			if (const auto now = std::chrono::steady_clock::now(); now - last_retry >= std::chrono::seconds(1))
+			{
+				last_retry = now;
+				request_pad_data();
+			}
 			if (first_read) // workaroud: first read always fails?
 				first_read = false;
 			else

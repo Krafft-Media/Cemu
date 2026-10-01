@@ -312,6 +312,10 @@ bool TestWriteAccess(const fs::path& p)
 // make path relative to Cemu directory
 fs::path MakeRelativePath(const fs::path& base, const fs::path& path)
 {
+	// lexical first: fs::relative resolves links, so a pack inside a symlinked/junctioned graphicPacks
+	// folder would get a ../.. path that never matches its settings entry
+	if (fs::path lexical = path.lexically_normal().lexically_relative(base.lexically_normal()); !lexical.empty() && *lexical.begin() != "..")
+		return lexical;
 	try
 	{
 		return fs::relative(path, base);

@@ -998,6 +998,22 @@ namespace nsyshid
 		return s_listSkylanders;
 	}
 
+	std::vector<SkylanderUSB::SlotInfo> SkylanderUSB::GetLoadedSlots()
+	{
+		std::lock_guard lock(m_skyMutex);
+		std::vector<SlotInfo> slots;
+		for (uint8 i = 0; i < MAX_SKYLANDERS; i++)
+		{
+			const auto& sky = m_skylanders[i];
+			if ((sky.status & 1) == 0)
+				continue;
+			const uint16 skyId = uint16(sky.data[0x11]) << 8 | uint16(sky.data[0x10]);
+			const uint16 skyVar = uint16(sky.data[0x1D]) << 8 | uint16(sky.data[0x1C]);
+			slots.push_back({i, sky.status, skyId, skyVar});
+		}
+		return slots;
+	}
+
 	void SkylanderUSB::Skylander::Save()
 	{
 		if (!skyFile)

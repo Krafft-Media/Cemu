@@ -403,7 +403,8 @@ void cemu_initForGame()
 	// check for debugger entrypoint bp
     if (g_gdbstub)
     {
-        g_gdbstub->HandleEntryStop(_entryPoint);
+        if (LaunchSettings::GDBStubEntryStop())
+            g_gdbstub->HandleEntryStop(_entryPoint);
         g_gdbstub->Initialize();
     }
 	debugger_handleEntryBreakpoint(_entryPoint);

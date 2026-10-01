@@ -273,7 +273,7 @@ bool GDBServer::Initialize()
 
 	memset(&m_server_addr, 0, sizeof(m_server_addr));
 	m_server_addr.sin_family = AF_INET;
-	m_server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	m_server_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // the stub has no authentication, so only local debuggers
 	m_server_addr.sin_port = htons(m_port);
 
 	if (bind(m_server_socket, (sockaddr*)&m_server_addr, sizeof(m_server_addr)) == SOCKET_ERROR)
@@ -316,13 +316,24 @@ void GDBServer::ThreadFunc()
 				return true;
 			};
 
+			bool disconnected = false;
 			auto readChar = [&]() -> char {
 				char ret = 0;
-				recv(m_client_socket, &ret, 1, 0);
+				if (recv(m_client_socket, &ret, 1, 0) <= 0)
+					disconnected = true;
 				return ret;
 			};
 
 			char packetPrefix = readChar();
+			if (disconnected)
+			{
+				// accept the next debugger instead of spinning on a closed socket
+				cemuLog_logDebug(LogType::Force, "[GDBStub] Client disconnected");
+				closesocket(m_client_socket);
+				m_client_socket = INVALID_SOCKET;
+				m_client_connected = false;
+				continue;
+			}
 
 			switch (packetPrefix)
 			{
@@ -354,7 +365,7 @@ void GDBServer::ThreadFunc()
 				for (uint32_t i = 1;; i++)
 				{
 					char c = readChar();
-					if (c == '#')
+					if (c == '#' || disconnected)
 						break;
 					checkedSum += static_cast<uint8>(c);
 					message.push_back(c);
@@ -362,6 +373,8 @@ void GDBServer::ThreadFunc()
 					if (i >= s_maxPacketSize)
 						cemuLog_logDebug(LogType::Force, "[GDBStub] Received too big of a buffer: {}", message);
 				}
+				if (disconnected)
+					break; // handled at the next packet prefix read
 				char checkSumStr[2];
 				receiveMessage(checkSumStr, 2);
 				uint32_t checkSum = std::stoi(std::string(checkSumStr, sizeof(checkSumStr)), nullptr, 16);

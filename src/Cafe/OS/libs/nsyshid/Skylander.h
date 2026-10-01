@@ -92,6 +92,16 @@ namespace nsyshid
 		static std::map<const std::pair<const uint16, const uint16>, const char*> GetListSkylanders();
 		std::string FindSkylander(uint16 skyId, uint16 skyVar);
 
+		struct SlotInfo
+		{
+			uint8 slot;
+			uint8 status;
+			uint16 skyId;
+			uint16 skyVar;
+		};
+		// figures currently on the portal (status & 1), for the Dispatcher control server
+		std::vector<SlotInfo> GetLoadedSlots();
+
 	  protected:
 		std::mutex m_skyMutex;
 		std::mutex m_queryMutex;

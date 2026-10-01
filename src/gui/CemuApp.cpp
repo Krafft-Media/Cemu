@@ -1,5 +1,6 @@
 #include "gui/CemuApp.h"
 #include "gui/MainWindow.h"
+#include "gui/DispatcherControl.h"
 #include "gui/wxgui.h"
 #include "config/CemuConfig.h"
 #include "Cafe/HW/Latte/Renderer/Vulkan/VulkanAPI.h"
@@ -111,6 +112,8 @@ void CemuApp::DeterminePaths(std::set<fs::path>& failedWriteAccess) // for Windo
 			user_data_path = config_path = cache_path = exePath.parent_path();
 		}
 	}
+	if (const auto userDataDir = LaunchSettings::GetUserDataDir())
+		user_data_path = config_path = cache_path = *userDataDir;
 	ActiveSettings::SetPaths(isPortable, exePath, user_data_path, config_path, cache_path, data_path, failedWriteAccess);
 }
 #endif
@@ -159,6 +162,8 @@ void CemuApp::DeterminePaths(std::set<fs::path>& failedWriteAccess) // for Linux
 		cache_path = standardPaths.GetUserDir(wxStandardPaths::Dir::Dir_Cache).ToStdString();
 		cache_path /= appName.ToStdString();
 	}
+	if (const auto userDataDir = LaunchSettings::GetUserDataDir())
+		user_data_path = config_path = cache_path = *userDataDir;
 	ActiveSettings::SetPaths(isPortable, exePath, user_data_path, config_path, cache_path, data_path, failedWriteAccess);
 }
 #endif
@@ -191,6 +196,8 @@ void CemuApp::DeterminePaths(std::set<fs::path>& failedWriteAccess) // for MacOS
 		cache_path = standardPaths.GetUserDir(wxStandardPaths::Dir::Dir_Cache).ToStdString();
 		cache_path /= appName.ToStdString();
 	}
+	if (const auto userDataDir = LaunchSettings::GetUserDataDir())
+		user_data_path = config_path = cache_path = *userDataDir;
 	ActiveSettings::SetPaths(isPortable, exePath, user_data_path, config_path, cache_path, data_path, failedWriteAccess);
 }
 #endif
@@ -333,6 +340,9 @@ bool CemuApp::OnInit()
 
 	SetTopWindow(m_mainFrame);
 	m_mainFrame->Show();
+
+	if (const auto controlPort = LaunchSettings::GetControlPort())
+		DispatcherControl::Start(*controlPort);
 
 #if BOOST_OS_LINUX && HAS_WAYLAND
 	if (wxWlIsWaylandWindow(m_mainFrame))

@@ -29,6 +29,12 @@ public:
 
 	static std::optional<uint32> GetPersistentId() { return s_persistent_id; }
 
+	// Dispatcher: per-instance data folder, control server port, log mirroring to stdout
+	static std::optional<fs::path> GetUserDataDir() { return s_user_data_dir; }
+	static std::optional<uint16> GetControlPort() { return s_control_port; }
+	static bool LogToStdout() { return s_log_stdout; }
+	static bool GDBStubEntryStop() { return s_gdbstub_entry_stop; }
+
 private:
 	inline static std::optional<fs::path> s_load_game_file{};
     inline static std::optional<uint64> s_load_title_id{};
@@ -43,6 +49,11 @@ private:
 	inline static bool s_force_interpreter = false;
 	
 	inline static std::optional<uint32> s_persistent_id{};
+
+	inline static std::optional<fs::path> s_user_data_dir{};
+	inline static std::optional<uint16> s_control_port{};
+	inline static bool s_log_stdout = false;
+	inline static bool s_gdbstub_entry_stop = true;
 
 	static bool ExtractorTool(std::wstring_view wud_path, std::string_view output_path, std::wstring_view log_path);
 };

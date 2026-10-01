@@ -69,7 +69,12 @@ bool LaunchSettings::HandleCommandline(const std::vector<std::wstring>& args)
 		("account,a", po::value<std::string>(), "Persistent id of account")
 
 		("force-interpreter", po::value<bool>()->implicit_value(true), "Force interpreter CPU emulation, disables recompiler")
-		("enable-gdbstub", po::value<bool>()->implicit_value(true), "Enable GDB stub to debug executables inside Cemu using an external debugger");
+		("enable-gdbstub", po::value<bool>()->implicit_value(true), "Enable GDB stub to debug executables inside Cemu using an external debugger")
+
+		("user-data-dir", po::wvalue<std::wstring>(), "Folder for settings, controller profiles, graphic packs, caches and logs (like portable mode)")
+		("control-port", po::value<uint16>(), "Listen for Dispatcher control commands on 127.0.0.1:<port> (token from CEMU_DISPATCHER_TOKEN)")
+		("log-stdout", po::value<bool>()->implicit_value(true), "Mirror log.txt to stdout")
+		("gdbstub-no-entry-stop", po::value<bool>()->implicit_value(true), "With --enable-gdbstub: let the title run instead of pausing at its entry point until a debugger continues it");
 
 	po::options_description hidden{ "Hidden options" };
 	hidden.add_options()
@@ -176,6 +181,20 @@ bool LaunchSettings::HandleCommandline(const std::vector<std::wstring>& args)
 		
 		if (vm.count("enable-gdbstub"))
 			s_enable_gdbstub = vm["enable-gdbstub"].as<bool>();
+
+		if (vm.count("user-data-dir"))
+		{
+			std::wstring tmp = vm["user-data-dir"].as<std::wstring>();
+			if (tmp.size() > 0 && tmp.front() == '=')
+				tmp.erase(tmp.begin() + 0);
+			s_user_data_dir = tmp;
+		}
+		if (vm.count("control-port"))
+			s_control_port = vm["control-port"].as<uint16>();
+		if (vm.count("log-stdout"))
+			s_log_stdout = vm["log-stdout"].as<bool>();
+		if (vm.count("gdbstub-no-entry-stop"))
+			s_gdbstub_entry_stop = !vm["gdbstub-no-entry-stop"].as<bool>();
 
 		std::wstring extract_path, log_path;
 		std::string output_path;

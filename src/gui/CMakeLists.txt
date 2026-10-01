@@ -48,6 +48,8 @@ add_library(CemuGui
   dialogs/SaveImport/SaveImportWindow.h
   dialogs/SaveImport/SaveTransfer.cpp
   dialogs/SaveImport/SaveTransfer.h
+  DispatcherControl.cpp
+  DispatcherControl.h
   DownloadGraphicPacksWindow.cpp
   DownloadGraphicPacksWindow.h
   GameProfileWindow.cpp
