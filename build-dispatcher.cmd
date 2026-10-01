@@ -13,6 +13,9 @@ cd /d "%~dp0"
 if "%1"=="configure" goto configure
 if exist out\build\Release\build.ninja goto build
 :configure
-cmake -S . -B out\build\Release -G Ninja -DCMAKE_BUILD_TYPE=Release || exit /b 1
+rem Debug info (bin\Cemu_release.pdb) lets Cemu's crash log name the functions; the PDB is not shipped.
+cmake -S . -B out\build\Release -G Ninja -DCMAKE_BUILD_TYPE=Release ^
+  "-DCMAKE_C_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /Z7" "-DCMAKE_CXX_FLAGS_RELEASE=/O2 /Ob2 /DNDEBUG /Z7" ^
+  "-DCMAKE_EXE_LINKER_FLAGS_RELEASE=/DEBUG /OPT:REF /OPT:ICF" || exit /b 1
 :build
 cmake --build out\build\Release || exit /b 1

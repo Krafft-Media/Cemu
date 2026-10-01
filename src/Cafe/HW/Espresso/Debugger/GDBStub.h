@@ -20,6 +20,8 @@ public:
 	void HandleEntryStop(uint32 entryAddress);
 	void HandleTrapInstruction(PPCInterpreter_t* hCPU);
 	void HandleAccessException(uint64 dr6);
+	// Removes every breakpoint and the watchpoint and resumes the threads the stub paused, so the title can run or shut down without the debugger
+	void ReleaseThreads();
 
 	enum class CMDType : char
 	{
@@ -224,6 +226,7 @@ private:
 	std::atomic_bool m_resume_startup = false;
 	MPTR m_entry_point{};
 	std::unique_ptr<CommandContext> m_resumed_context;
+	std::atomic_bool m_threads_paused = false; // set when the stub suspended the threads, cleared when it resumes them
 
 	std::atomic_bool m_client_connected;
 	SOCKET m_server_socket = INVALID_SOCKET;

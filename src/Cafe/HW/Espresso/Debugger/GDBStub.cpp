@@ -15,7 +15,7 @@
 #define GET_THREAD_ID(threadPtr) memory_getVirtualOffsetFromPointer(threadPtr)
 #define GET_THREAD_BY_ID(threadId) (OSThread_t*)memory_getPointerFromPhysicalOffset(threadId)
 
-static std::vector<MPTR> findNextInstruction(MPTR currAddress, uint32 lr, uint32 ctr)
+static std::vector<MPTR> findNextInstructionUnchecked(MPTR currAddress, uint32 lr, uint32 ctr)
 {
 	using namespace Espresso;
 
@@ -35,7 +35,7 @@ static std::vector<MPTR> findNextInstruction(MPTR currAddress, uint32 lr, uint32
 		BOField BO{};
 		bool AA, LK;
 		decodeOp_BC(nextInstr, BD, BO, BI, AA, LK);
-		if (!LK)
+		if (!AA)
 			BD += currAddress;
 		return {currAddress + 4, BD};
 	}
@@ -48,6 +48,16 @@ static std::vector<MPTR> findNextInstruction(MPTR currAddress, uint32 lr, uint32
 		return {currAddress + 4, ctr};
 	}
 	return {currAddress + 4};
+}
+
+// Planting a breakpoint reads and patches guest memory, so a target outside mapped memory would crash Cemu
+static std::vector<MPTR> findNextInstruction(MPTR currAddress, uint32 lr, uint32 ctr)
+{
+	if (!memory_isAddressRangeAccessible(currAddress, 4))
+		return {};
+	std::vector<MPTR> nextInstructions = findNextInstructionUnchecked(currAddress, lr, ctr);
+	std::erase_if(nextInstructions, [](MPTR addr) { return (addr & 3) != 0 || !memory_isAddressRangeAccessible(addr, 4); });
+	return nextInstructions;
 }
 
 template<typename F>
@@ -329,6 +339,9 @@ void GDBServer::ThreadFunc()
 			{
 				// accept the next debugger instead of spinning on a closed socket
 				cemuLog_logDebug(LogType::Force, "[GDBStub] Client disconnected");
+				// like a detach: a debugger that went away must not leave the title frozen
+				m_resumed_context.reset();
+				ReleaseThreads();
 				closesocket(m_client_socket);
 				m_client_socket = INVALID_SOCKET;
 				m_client_connected = false;
@@ -345,6 +358,7 @@ void GDBServer::ThreadFunc()
 				cemuLog_logDebug(LogType::Force, "[GDBStub] Received interrupt (pressed CTRL+C?) from client!");
 				selectAndBreakThread(-1, [](OSThread_t* thread) {
 				});
+				m_threads_paused = true;
 				auto thread_status = fmt::format("T05thread:{:08X};", GET_THREAD_ID(coreinit::OSGetDefaultThread(1)));
 				if (this->m_resumed_context)
 				{
@@ -606,6 +620,7 @@ void GDBServer::HandleVCont(std::unique_ptr<CommandContext>& context)
 		return context->QueueResponse(RESPONSE_EMPTY);
 
 	m_resumed_context = std::move(context);
+	m_threads_paused = false;
 
 	bool resumedNoThreads = true;
 	for (const auto operation : TokenizeView(m_resumed_context->GetArgs()[1], ';'))
@@ -623,7 +638,8 @@ void GDBServer::HandleVCont(std::unique_ptr<CommandContext>& context)
 		else if (operationType == "s" || operationType.starts_with("S"))
 		{
 			selectThread(threadSelector, [this](OSThread_t* thread) {
-				auto nextInstructions = findNextInstruction(thread->context.srr0, thread->context.lr, thread->context.ctr);
+				// the saved context keeps LR byte-swapped (unlike CTR and SRR0), see __OSSaveThreadContext / CMDReadRegister
+				auto nextInstructions = findNextInstruction(thread->context.srr0, CPU_swapEndianU32(thread->context.lr), thread->context.ctr);
 				for (MPTR nextInstr : nextInstructions)
 				{
 					auto bpIt = m_patchedInstructions.find(nextInstr);
@@ -646,6 +662,7 @@ void GDBServer::HandleVCont(std::unique_ptr<CommandContext>& context)
 void GDBServer::CMDContinue(std::unique_ptr<CommandContext>& context)
 {
 	m_resumed_context = std::move(context);
+	m_threads_paused = false;
 	selectAndResumeThread(m_activeThreadContinueSelector);
 }
 
@@ -965,6 +982,7 @@ void GDBServer::HandleTrapInstruction(PPCInterpreter_t* hCPU)
 			ThreadPool::FireAndForget(&waitForBrokenThreads, std::make_unique<CommandContext>(this, ""), pauseReason);
 		}
 
+		m_threads_paused = true;
 		breakThreads(GET_THREAD_ID(coreinit::OSGetCurrentThread()));
 		cemuLog_logDebug(LogType::Force, "[GDBStub] Resumed from a breakpoint!");
 	}
@@ -997,6 +1015,14 @@ void GDBServer::HandleAccessException(uint64 dr6)
 				bpIt->second.PauseOnNextInterrupt();
 		}
 	}
+}
+
+void GDBServer::ReleaseThreads()
+{
+	m_watch_point.reset();
+	m_patchedInstructions.clear(); // each breakpoint restores its original instruction
+	if (m_threads_paused.exchange(false))
+		selectAndResumeThread(-1);
 }
 
 void GDBServer::HandleEntryStop(uint32 entryAddress)

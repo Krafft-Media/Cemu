@@ -6,6 +6,7 @@
 #include "Cafe/GraphicPack/GraphicPack2.h"
 #include "Cafe/HW/Latte/Core/LatteAsyncCommands.h"
 #include "Cafe/HW/MMU/MMU.h"
+#include "Cafe/HW/Espresso/Debugger/GDBStub.h"
 #include "Cafe/HW/Espresso/Recompiler/PPCRecompiler.h"
 #include "Cafe/OS/libs/nsyshid/Skylander.h"
 #include "Common/FileStream.h"
@@ -186,6 +187,9 @@ namespace DispatcherControl
 
 	static void CmdQuit(const Value&, Value& out, Json::AllocatorType&)
 	{
+		// threads paused by the debugger would keep the title from shutting down
+		if (g_gdbstub)
+			g_gdbstub->ReleaseThreads();
 		// not awaited: closing the main window ends the process
 		wxTheApp->CallAfter([] {
 			if (g_mainFrame)
