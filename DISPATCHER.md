@@ -23,6 +23,8 @@ else is upstream Cemu; see [README.md](README.md) and [BUILD.md](BUILD.md).
 
 - The GDB stub listens on loopback only (it has no authentication) and accepts a new debugger
   after a disconnect instead of spinning on the closed socket.
+- Breakpoint and watchpoint hits are reported to the debugger even when it attached to a running
+  title (`--gdbstub-no-entry-stop`) and has not continued it yet.
 - The DSU client asks a silent server for pad data again every second, so input connects
   whichever side starts first.
 - Graphic packs inside a symlinked or junctioned `graphicPacks` folder keep their

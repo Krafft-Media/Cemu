@@ -959,6 +959,11 @@ void GDBServer::HandleTrapInstruction(PPCInterpreter_t* hCPU)
 			// Spin up thread to signal when another GDB stub trap is found
 			ThreadPool::FireAndForget(&waitForBrokenThreads, std::move(m_resumed_context), pauseReason);
 		}
+		else if (m_client_connected)
+		{
+			// attached without an entry stop (--gdbstub-no-entry-stop), so no continue is pending: report the stop unprompted, like an interrupt does
+			ThreadPool::FireAndForget(&waitForBrokenThreads, std::make_unique<CommandContext>(this, ""), pauseReason);
+		}
 
 		breakThreads(GET_THREAD_ID(coreinit::OSGetCurrentThread()));
 		cemuLog_logDebug(LogType::Force, "[GDBStub] Resumed from a breakpoint!");
